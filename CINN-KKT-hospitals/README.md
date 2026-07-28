@@ -1,244 +1,248 @@
 # CINN-KKT Hospital Surgery Scheduler
 
-# Objetivo de la rama
-En esta rama se busca una optimizacion mayor del modelo buscando distintos objetivos (calidad de tiempo de espera, optimizacion de costos del hospital, makespan, balanceo de carga en hospital, etc.)
+## Project Description
 
-## Descripción del Proyecto
+This project implements an automatic surgery planning system for hospitals using:
 
-Este proyecto implementa un sistema de planificación automática de cirugías en hospitales utilizando:
+- **CINN (Constraint-Informed Neural Networks)**: Neural networks that incorporate operational constraints directly into the model
+- **Lagrangian Optimization**: Dual variable method to enforce KKT constraints via ADMM
+- **Post-processing with Simulated Annealing (SA)**: Refinement of solutions through multi-objective local search
+- **Gumbel Softmax**: Differentiable relaxation of discrete decisions during training
 
-- **CINN (Constraint-Informed Neural Networks)**: Redes neuronales que incorporan restricciones operacionales directamente en el modelo
-- **Optimización Lagrangiana**: Método de variables duales para enforcar restricciones KKT
-- **post procesamiento HC (Hill Climbing) o SA (Simulated Annealing)**: Post-procesamiento para refinar soluciones
-- **Gumbel Softmax**: Relajación de decisiones discretas durante el entrenamiento
+### Key Features
 
-### Características Principales
+- **Multi-Stage Optimization**: Handles 3 surgical stages (preoperative, operating room, postoperative)
+- **Resource Management**: Intelligent room assignment with limited capacity (R = 4 rooms per stage)
+- **Visualizations**: Detailed Gantt charts and idle-time histograms
 
-- **Optimización Multi-Etapa**: Maneja 3 etapas quirúrgicas (preoperatorio, quirófano, postoperatorio)
-- **Gestión de Recursos**: Asignación inteligente de pabellones con capacidad limitada (R=4)
-- **Visualizaciones**: Gráficos Gantt detallados e histogramas de tiempos muertos
 ---
 
-## Estructura del Proyecto
+## Project Structure
 
 ```
 CINN-KKT-hospitals/
-├── main.py                    # Punto de entrada principal
-├── requirements.txt           # Dependencias del proyecto
-├── README.md                  
-├── LICENSE                    # Licencia del proyecto
+├── main.py                    # Main entry point
+├── main_estadistica.py        # Statistical analysis and boxplots
+├── requirements.txt           # Project dependencies
+├── README.md
+├── LICENSE                    # MIT License
 │
-├── src/                       # Módulos principales
+├── src/                       # Core modules
 │   ├── __init__.py
-│   ├── data_loader.py         # Carga y preprocesamiento de datos
-│   ├── model.py               # Arquitectura CINN (SchedulePINN)
-│   ├── constraints.py         # Restricciones KKT y variables duales
-│   ├── trainer.py             # Loop de entrenamiento con ADMM
-│   ├── post_processing.py     # Decodificación y recocido simulado
-│   ├── visualization.py       # Gráficos Gantt e histogramas
-│   └── __pycache__/
+│   ├── data_loader.py         # Data loading and preprocessing
+│   ├── data_cleaner.py        # Clinical filtering and tensor construction
+│   ├── model.py               # CINN architecture (SchedulePINN)
+│   ├── constraints.py         # KKT constraints and dual variables
+│   ├── trainer.py             # ADMM training loop
+│   ├── post_processing.py     # Decoding and Simulated Annealing
+│   └── visualization.py       # Gantt charts and histograms
 │
 └── data/
     ├── raw/
     │   └── 2_dataset_procesado_actualizado.csv
-    └── processed/
-        ├── solucion_final_optimizada.csv
-        ├── gantt_final.png
-        └── esperas_histograma.png
+    ├── processed/
+    │   └── solucion_final_optimizada.csv
+    └── figures/               # PDF and PNG figures (convergence, Gantt, histograms, boxplots)
 ```
 
 ---
 
-## Requisitos
+## Requirements
 
 - **Python 3.8+**
-- **CUDA 11.0+** (recomendado para GPU, pero CPU también funciona)
+- **CUDA 11.0+** (recommended for GPU; CPU also works)
 
 ---
 
-## Instalación
+## Installation
 
+### Create virtual environment
 
-
-### Crear entorno virtual
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # En Windows: .venv\Scripts\activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-### 3. Instalar dependencias
+### Install dependencies
+
 ```bash
 python -m pip install -r requirements.txt
 ```
 
 ---
 
-## Uso
+## Usage
 
-### Cargas
-Cargar el .csv "2_dataset_procesado_actualizado.csv" en la carpeta "data/raw/" antes de correr el proyecto.
+### Data
 
-### Ejecución Completa
+Place the file `2_dataset_procesado_actualizado.csv` in the `data/raw/` folder before running the project.
+
+### Full Execution
 
 ```bash
 python main.py
 ```
 
-Este comando ejecutará el pipeline completo:
+This command runs the complete pipeline:
 
-1. **[1/5] Carga de Datos**: Lee y preprocesa el CSV hospitalario
-2. **[2/5] Inicialización**: Crea la red neuronal CINN
-3. **[3/5] Entrenamiento**: Entrena con restricciones KKT (10,000 steps)
-4. **[4/5] Post-Procesamiento**: Aplica recocido simulado (5,000 iteraciones)
-5. **[5/5] Generación de Reportes**: Guarda resultados y visualizaciones
+1. **[1/5] Data Loading**: Reads and preprocesses the hospital CSV
+2. **[2/5] Initialization**: Creates the CINN neural network
+3. **[3/5] Training**: Trains with KKT constraints (8,000 steps)
+4. **[4/5] Post-Processing**: Applies Simulated Annealing (3,000 iterations)
+5. **[5/5] Report Generation**: Saves results and visualizations
 
-### Parámetros Configurables
+### Configurable Parameters
 
-En `main.py` y `src/trainer.py` puedes ajustar:
+In `main.py` and `src/trainer.py`:
 
 ```python
-# data_loader.py
-target_date = '2023-02-01'  # Fecha a analizar
-num_samples = 16            # Número de pacientes
-buffer_time = 20.0          # Buffer setup/cleanup (minutos)
+# main.py
+target_date = '2023-02-01'  # Target date to analyze
+num_samples = 16            # Number of patients
 
 # trainer.py
-MAX_STEPS = 10000           # Iteraciones de entrenamiento
-rho_start = 100.0           # Penalización inicial
-tau_start = 2.0             # Temperatura Gumbel inicial
-w_balance = 50.0            # Peso del balanceo de carga
+MAX_STEPS = 8000            # Training iterations
+rho_start = 100.0           # Initial ADMM penalty
+tau_start = 2.0             # Initial Gumbel temperature
+w_balance = 50.0            # Load balancing weight
 ```
 
 ---
 
-## Salidas Generadas
+## Generated Outputs
 
-El programa genera archivos en `data/processed/`:
+The program generates files in `data/processed/` and `data/figures/`:
 
 ### 1. **solucion_final_optimizada.csv**
-Tabla con la solución optimizada:
-- `job_id`: ID del paciente
-- `stage_id`: Etapa (0=preoperatorio, 1=quirófano, 2=postoperatorio)
-- `machine_id`: Pabellón asignado (1-4)
-- `real_start`: Hora de inicio (minutos)
-- `real_end`: Hora de fin (minutos)
-- `dur_medical`: Duración de la intervención
-- `dur_occupancy`: Ocupación total (intervención + buffers)
 
-### 2. **gantt_final.png**
-Gráfico Gantt visual con:
-- Barras de color por paciente (intervención médica en gris)
-- Buffers de setup (dorado) y cleanup (rojo)
-- Líneas separadoras por etapa
-- Makespan total en el título
+Table with the optimized solution:
 
-### 3. **esperas_histograma.png**
-Histogramas de distribución de tiempos muertos entre etapas
+- `job_id`: Patient ID
+- `stage_id`: Stage (0 = preoperative, 1 = operating room, 2 = postoperative)
+- `global_machine_id`: Assigned room (1-12)
+- `real_start`: Start time in minutes (setup begins)
+- `surgery_start`: Start time in minutes (surgery begins)
+- `real_end`: Medical end time in minutes (surgery ends)
+- `machine_end`: Machine occupancy end time in minutes (includes cleanup)
+- `dur_medical`: Duration of the intervention
+- `dur_occupancy`: Total occupancy (intervention + setup/cleanup buffer)
+
+### 2. **fig3_gantt.png / .pdf**
+
+Gantt chart showing:
+
+- Color-coded bars per patient
+- Setup (yellow) and cleanup (coral) buffers
+- Stage separator lines
+- Patient labels (P{j}) for surgeries longer than 8 minutes
+
+### 3. **fig4_wait_times.png / .pdf**
+
+Histograms of inter-stage wait times with mean indicators (red dashed) and W_max threshold (black dashed).
+
+### 4. Additional Statistical Figures
+
+- **fig2_convergence.png / .pdf**: Primal-dual convergence curve (makespan vs. KKT violations)
+- **fig5_hist_kde.png / .pdf**: Enhanced wait-time histogram with KDE
+- **fig6_boxplot_util.png / .pdf**: Boxplot of resource utilization per stage
+- **fig7_flow_time.png / .pdf**: Boxplot of real vs. ideal patient flow time
 
 ---
 
-## Arquitectura del Modelo
+## Model Architecture
 
-### Red Neuronal CINN (SchedulePINN)
+### CINN Neural Network (SchedulePINN)
 
 ```
-Entrada: ID del Paciente (embedding de 128 dims)
+Input: Patient ID (128-dim embedding)
     ↓
-[3 capas Tanh de 128 neuronas]
+[3 Tanh layers with 128 neurons]
     ↓
-Salida Dual:
-  ├─ Start Times: softplus(W) * 300 → [J, I]
+Dual Output:
+  ├─ Start Times: softplus(W) × 300 → [J, I]
   └─ Machine Probs: Gumbel Softmax(logits) → [J, I, R]
 ```
 
-### Función de Pérdida
+### Loss Function
 
-$$\mathcal{L} = w_{obj} \cdot \text{makespan} + \lambda \cdot g^T \mu + \frac{\rho}{2} \|g_+\|^2 + w_{bal} \cdot \sigma(\text{cargas})$$
+$$\mathcal{L} = w_{obj} \cdot \text{makespan} + \mu^T \cdot g + \frac{\rho}{2} \|g_+\|^2 + w_{bal} \cdot \sigma(\text{loads})$$
 
-Donde:
-- $g$: Violaciones de restricciones
-- $\mu$: Variables duales (método ADMM)
-- $\rho$: Penalización (crece con las iteraciones)
-- $\sigma$: Desv. est. de carga de máquinas
+Where:
+- $g$: KKT constraint violations
+- $\mu$: Lagrange multipliers (ADMM dual ascent)
+- $\rho$: Penalty coefficient (increases with iterations)
+- $\sigma$: Standard deviation of machine loads (load balancing)
 
-### Restricciones Implementadas
+### KKT Constraints
 
-1. **Secuencialidad**: $s_{j,i+1} \geq s_{j,i} + p_{j,i}$ ∀ j,i
-2. **Tiempos de Espera**: $s_{j,i+1} - s_{j,i} - p_{j,i} \leq W_{max}$
-3. **No Solapamiento**: Evita conflictos en recursos (probabilístico)
+1. **Sequentiality**: $s_{j,i+1} \geq s_{j,i} + p_{j,i}$ for all j, i
+2. **Maximum Wait Time**: $s_{j,i+1} - s_{j,i} - p_{j,i} \leq W_{max}$ with $W_{max} = 25$ min
+3. **Resource Non-Overlap**: Prevents conflicts on shared machines (probabilistic over Gumbel-Softmax assignments)
+
+Additionally, the discrete-event scheduler enforces setup time (30 min), cleanup time (20 min), setup overlap (up to 30 min), and stage ordering.
+
+**Total KKT constraint vector**: $g \in \mathbb{R}^{4J+1}$ (65 constraints for $J = 16$ patients).
 
 ---
 
-## Componentes Clave
+## Key Components
 
-### `data_loader.py`
-- Limpieza de valores nulos
-- Conversión de timestamps
-- Cálculo de duraciones
-- Filtrado por fecha específica
+### `data_loader.py` / `data_cleaner.py`
+- Null value removal
+- Timestamp conversion
+- Duration calculation
+- Date-specific filtering
+- Clinical sanity checks
 
 ### `model.py`
-- Definición de SchedulePINN
-- Inicialización Xavier Normal
-- Forward pass con relajación Gumbel Softmax
+- SchedulePINN architecture definition
+- Xavier Normal initialization
+- Forward pass with Gumbel Softmax relaxation
 
 ### `constraints.py`
-- Construcción de restricciones KKT
-- Variables duales (método ADMM)
-- Cálculo de violaciones
+- KKT constraint vector construction
+- Dual variables (ADMM method)
+- Violation calculation
 
 ### `trainer.py`
-- Loop ADMM alternante
-- Actualización de dual variables
-- Annealing de temperatura τ y penalización ρ
-- Guardado de mejor modelo
+- Alternating ADMM loop
+- Dual variable update with adaptive frequency
+- Temperature ($\tau$) and penalty ($\rho$) annealing
+- Pareto-optimal model selection
 
 ### `post_processing.py`
-- Extracción de topología (decodificación de máquinas)
-- Recocido simulado para refinamiento
-- Intercambio de trabajos entre máquinas
+- Topology extraction (machine decoding via argmax)
+- Multi-objective Simulated Annealing (makespan + 0.15 × wait + 0.50 × imbalance)
+- Stage-ordered scheduling with setup overlap
 
 ### `visualization.py`
-- Gráficos Gantt con buffers visualizados
-- Histogramas de esperas por transición de etapa
+- Gantt charts with setup/surgery/cleanup decomposition
+- Inter-stage wait time histograms
+- Convergence curves, statistical boxplots
 
 ---
 
-## Referencias Técnicas
+## Technical References
 
-- **Informed Neural Networks**: Familia de Redes Neuronales informadas por distintas fuentes.
-- **Constraint-Informed Neural Networks**: Incorporan restricciones matemáticas
-- **Gumbel Softmax**: Relajación diferenciable de decisiones discretas (Maddison et al., 2017)
-- **Job Shop Scheduling**: Problema NP-hard base del proyecto
-
----
-
-## Licencia
-
-Este proyecto está bajo la **Licencia MIT**.
-
-```
-MIT License
-
-Copyright (c) 2026 PUCV Investigación
-
-Se otorga permiso, sin costo, a cualquier persona que obtenga una copia
-de este software y los archivos de documentación asociados (el "Software"),
-para usar el Software sin restricción, incluyendo sin limitación los derechos
-de usar, copiar, modificar, fusionar, publicar, distribuir, sublicenciar y/o
-vender copias del Software.
-
-El Software se proporciona "TAL CUAL", sin garantía de ningún tipo.
-```
+- **Informed Neural Networks**: Family of Neural Networks informed by various sources of domain knowledge
+- **Constraint-Informed Neural Networks**: Incorporate mathematical constraints into the learning objective
+- **Gumbel Softmax**: Differentiable relaxation of discrete decisions (Maddison et al., 2017)
+- **Job Shop Scheduling**: Base NP-hard problem of this project
 
 ---
 
-## Contacto
+## License
 
-nicolas.fuentes@pucv.cl
-marcelo.becerra@pucv.cl
-carlos.valle@pucv.cl
+MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
-**Última actualización**: Febrero 2026
+## Contact
+
+- nicolas.fuentes@pucv.cl
+- marcelo.becerra@pucv.cl
+- carlos.valle@pucv.cl
+
+---
+
+**Last updated**: July 2026
