@@ -6,10 +6,10 @@ import os
 import seaborn as sns
 
 # Configurar el estilo científico de Seaborn
-sns.set_theme(style="whitegrid", context="paper", font_scale=1.2)
+sns.set_theme(style="whitegrid", context="paper", font_scale=1.3)
 
 #ploteo de carta gantt
-def plot_advanced_gantt(df, makespan, J, setup_mins=30.0, output_path="data/processed/gantt_final.png"):
+def plot_advanced_gantt(df, makespan, J, setup_mins=30.0, output_path="data/figures/fig3_gantt.png"):
     fig, ax = plt.subplots(figsize=(20, 12))
     colors = plt.cm.get_cmap('tab20', J)
     
@@ -34,14 +34,14 @@ def plot_advanced_gantt(df, makespan, J, setup_mins=30.0, output_path="data/proc
         ax.add_patch(patches.Rectangle((start + setup + dur_med, y - 0.4), cleanup, 0.8, 
                                        linewidth=0.5, edgecolor='black', facecolor='#FF6347', alpha=0.8))
         
-        if dur_med > 30:
-            ax.text(start + setup + dur_med/2, y, f"P{j}", ha='center', va='center', color='white', fontweight='bold', fontsize=8)
+        if dur_med > 8:
+            ax.text(start + setup + dur_med/2, y, f"P{j}", ha='center', va='center', color='white', fontweight='bold', fontsize=10)
 
     # Legend
     setup_patch = patches.Patch(color='#FFD700', alpha=0.8, label='Setup (Room Preparation)')
     med_patch = patches.Patch(color='gray', alpha=0.9, label='Surgery / Intervention')
     clean_patch = patches.Patch(color='#FF6347', alpha=0.8, label='Cleanup (Cleaning)')
-    ax.legend(handles=[setup_patch, med_patch, clean_patch], loc='upper right', fontsize=12)
+    ax.legend(handles=[setup_patch, med_patch, clean_patch], loc='upper right', fontsize=14)
 
     ax.set_yticks(range(1, 13))
     labels = []
@@ -54,20 +54,20 @@ def plot_advanced_gantt(df, makespan, J, setup_mins=30.0, output_path="data/proc
     ax.axhline(y=4.5, color='black', linestyle='-', linewidth=2)
     ax.axhline(y=8.5, color='black', linestyle='-', linewidth=2)
     
-    ax.set_xlabel("Time (Minutes)", fontsize=14, fontweight='bold')
-    ax.set_title(f"Actual Surgical Planning (CINN + SA) - Makespan: {makespan:.0f} min\nVisual Detail: Setup (10m) + Surgery + Cleanup", fontsize=16)
+    ax.set_xlabel("Time (Minutes)", fontsize=16, fontweight='bold')
     
     ax.set_xlim(-makespan*0.02, makespan * 1.02)
     ax.set_ylim(0.5, 12.5)
     ax.grid(True, axis='x', linestyle=':', alpha=0.5)
     
     plt.tight_layout()
-    plt.savefig(output_path, dpi=300)
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.savefig(output_path.replace('.png', '.pdf'), bbox_inches='tight')
     print(f"Gantt chart saved to: {output_path}")
     plt.close()
 
 #ploteo KPI de histogramas
-def plot_wait_histograms(df, output_path="data/processed/esperas_histograma.png"):
+def plot_wait_histograms(df, w_max=25.0, output_path="data/figures/fig4_wait_times.png"):
     waits_dict = {}
     stages = sorted(df['stage_id'].unique())
 
@@ -97,17 +97,19 @@ def plot_wait_histograms(df, output_path="data/processed/esperas_histograma.png"
         ax.hist(arr, bins=10, alpha=0.75, color=colors[idx % len(colors)], edgecolor='black')
         
         mean_val = np.mean(arr)
-        ax.axvline(mean_val, color='red', linestyle='--', linewidth=2, label=f"Mean: {mean_val:.1f} min")
+        short = {0: "PRE", 1: "QX", 2: "POST"}
+        ax.axvline(mean_val, color='red', linestyle='--', linewidth=2, label=f"Mean ({short[i]}$\\to${short[ip1]}): {mean_val:.1f} min")
+        ax.axvline(w_max, color='black', linestyle='--', linewidth=2, label=f'$W_{{\\max}}$ = {w_max:.0f} min')
 
-        ax.set_title(f"Wait Times: {stage_names.get(i)} $\\to$ {stage_names.get(ip1)}")
-        ax.set_xlabel("Wait Time (min)")
-        if idx == 0: ax.set_ylabel("Frequency")
-        ax.legend()
+        ax.set_title(f"Wait Times: {stage_names.get(i)} $\\to$ {stage_names.get(ip1)}", fontsize=14)
+        ax.set_xlabel("Wait Time (min)", fontsize=12)
+        if idx == 0: ax.set_ylabel("Frequency", fontsize=12)
+        ax.legend(fontsize=11)
         ax.grid(axis='y', linestyle=':', alpha=0.4)
 
-    plt.suptitle("Distribution of Patient Idle Times", fontsize=14)
     plt.tight_layout()
-    plt.savefig(output_path, dpi=300)
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.savefig(output_path.replace('.png', '.pdf'), bbox_inches='tight')
     print(f"Histograms saved to: {output_path}")
     plt.close()
 
@@ -163,19 +165,19 @@ def generar_estadisticas_bai(csv_path="data/processed/solucion_final_optimizada.
     sns.histplot(data=df_waits, x='Wait (min)', hue='Phase', kde=True,
                  palette=['#1f77b4', '#ff7f0e'], bins=15, alpha=0.6, ax=ax1)
     
-    ax1.set_title("Distribution of Wait Times Between Surgical Stages", fontweight='bold', fontsize=14)
-    ax1.set_xlabel("Wait Time (Minutes)", fontweight='bold')
-    ax1.set_ylabel("Frequency (N° Patients)", fontweight='bold')
+    ax1.set_xlabel("Wait Time (Minutes)", fontweight='bold', fontsize=14)
+    ax1.set_ylabel("Frequency (N° Patients)", fontweight='bold', fontsize=14)
     
     # --- CORRECCIÓN AQUÍ: Uso de PRE, QX y POST ---
     mean_pre_qx = df_waits[df_waits['Phase'] == 'PRE -> QX']['Wait (min)'].mean()
     mean_qx_post = df_waits[df_waits['Phase'] == 'QX -> POST']['Wait (min)'].mean()
     ax1.axvline(mean_pre_qx, color='#1f77b4', linestyle='--', label=f'Mean PRE->QX: {mean_pre_qx:.1f}m')
     ax1.axvline(mean_qx_post, color='#ff7f0e', linestyle='--', label=f'Mean QX->POST: {mean_qx_post:.1f}m')
-    ax1.legend()
+    ax1.legend(fontsize=12)
     
     plt.tight_layout()
-    plt.savefig("data/processed/fig1_hist_esperas.png", dpi=300)
+    plt.savefig("data/figures/fig5_hist_kde.png", dpi=300, bbox_inches='tight')
+    plt.savefig("data/figures/fig5_hist_kde.pdf", bbox_inches='tight')
     plt.show()
 
     # =========================================================
@@ -184,17 +186,16 @@ def generar_estadisticas_bai(csv_path="data/processed/solucion_final_optimizada.
     fig2, ax2 = plt.subplots(figsize=(10, 6))
 
     # Boxplot para mostrar la dispersión por etapa
-# Cambia a esto:
-    sns.boxplot(data=df_util, x='Stage', y='Utilization (%)', hue='Stage', legend=False, palette="Set2", width=0.5, ax=ax2, boxprops=dict(alpha=0.8))    # Stripplot para mostrar los puntos individuales (cada pabellón)
+    sns.boxplot(data=df_util, x='Stage', y='Utilization (%)', hue='Stage', legend=False, palette="Set2", width=0.5, ax=ax2, boxprops=dict(alpha=0.8))
     sns.stripplot(data=df_util, x='Stage', y='Utilization (%)', color='black', alpha=0.7, jitter=True, size=8, ax=ax2)
     
-    ax2.set_title("Load Balancing per Stage", fontweight='bold', fontsize=14)
-    ax2.set_xlabel("Clinical Phase", fontweight='bold')
-    ax2.set_ylabel("Resource Utilization (%) over Makespan", fontweight='bold')
+    ax2.set_xlabel("Clinical Phase", fontweight='bold', fontsize=14)
+    ax2.set_ylabel("Resource Utilization (%) over Makespan", fontweight='bold', fontsize=14)
     ax2.set_ylim(0, 100)
     
     plt.tight_layout()
-    plt.savefig("data/processed/fig2_boxplot_utilizacion.png", dpi=300)
+    plt.savefig("data/figures/fig6_boxplot_util.png", dpi=300, bbox_inches='tight')
+    plt.savefig("data/figures/fig6_boxplot_util.pdf", bbox_inches='tight')
     #plt.show()
 
     # =========================================================
@@ -221,12 +222,12 @@ def generar_estadisticas_bai(csv_path="data/processed/solucion_final_optimizada.
     sns.boxplot(data=df_melted, x='Metric', y='Minutes', hue='Metric', legend=False, palette="Pastel1", width=0.5, ax=ax3)
     sns.stripplot(data=df_melted, x='Metric', y='Minutes', color='black', alpha=0.6, jitter=True, ax=ax3)
 
-    ax3.set_title("Patient Efficiency: Real vs Ideal Time", fontweight='bold', fontsize=14)
-    ax3.set_xlabel("", fontweight='bold')
-    ax3.set_ylabel("Minutes", fontweight='bold')
+    ax3.set_xlabel("", fontweight='bold', fontsize=14)
+    ax3.set_ylabel("Minutes", fontweight='bold', fontsize=14)
     
     plt.tight_layout()
-    plt.savefig("data/processed/fig3_boxplot_flow_time.png", dpi=300)
+    plt.savefig("data/figures/fig7_flow_time.png", dpi=300, bbox_inches='tight')
+    plt.savefig("data/figures/fig7_flow_time.pdf", bbox_inches='tight')
     plt.show()
 
     # --- CORRECCIÓN AQUÍ: Uso de PRE, QX y POST ---
@@ -239,7 +240,7 @@ def generar_estadisticas_bai(csv_path="data/processed/solucion_final_optimizada.
     print(f"Average Utilization POST: {df_util[df_util['Stage']=='POST']['Utilization (%)'].mean():.1f}%")
     print("===================================================================")
 
-def plot_convergence_curve(history_data, output_path="data/processed/convergencia_primal_dual.png"):
+def plot_convergence_curve(history_data, output_path="data/figures/fig2_convergence.png"):
     # Convertimos la lista de diccionarios en un DataFrame
     df = pd.DataFrame(history_data)
     
@@ -247,8 +248,8 @@ def plot_convergence_curve(history_data, output_path="data/processed/convergenci
 
     # EJE Y IZQUIERDO: Makespan (Azul)
     color1 = '#1f77b4' # Azul científico
-    ax1.set_xlabel('Training Iterations (Steps)', fontweight='bold', fontsize=12)
-    ax1.set_ylabel('Predicted Makespan (Minutes)', color=color1, fontweight='bold', fontsize=12)
+    ax1.set_xlabel('Training Iterations (Steps)', fontweight='bold', fontsize=14)
+    ax1.set_ylabel('Predicted Makespan (Minutes)', color=color1, fontweight='bold', fontsize=14)
     line1 = ax1.plot(df['step'], df['makespan'], color=color1, label='Makespan (Efficiency)', linewidth=2.5)
     ax1.tick_params(axis='y', labelcolor=color1)
     ax1.grid(True, axis='x', linestyle='--', alpha=0.7)
@@ -256,7 +257,7 @@ def plot_convergence_curve(history_data, output_path="data/processed/convergenci
     # EJE Y DERECHO: Violación KKT (Rojo)
     ax2 = ax1.twinx()  # Instanciar un segundo eje que comparte el mismo eje X
     color2 = '#d62728' # Rojo científico
-    ax2.set_ylabel('Maximum KKT Constraint Violation', color=color2, fontweight='bold', fontsize=12)
+    ax2.set_ylabel('Maximum KKT Constraint Violation', color=color2, fontweight='bold', fontsize=14)
     line2 = ax2.plot(df['step'], df['violation'], color=color2, label='Violations (Feasibility)', linewidth=2.5, alpha=0.85)
     ax2.tick_params(axis='y', labelcolor=color2)
     
@@ -266,10 +267,10 @@ def plot_convergence_curve(history_data, output_path="data/processed/convergenci
     # Añadir leyenda combinada abajo
     lines = line1 + line2
     labels = [l.get_label() for l in lines]
-    ax1.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2, frameon=False, fontsize=12)
+    ax1.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2, frameon=False, fontsize=14)
 
-    plt.title('Primal-Dual Convergence Curve of CINN Network', fontweight='bold', fontsize=14)
     plt.tight_layout()
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.savefig(output_path.replace('.png', '.pdf'), bbox_inches='tight')
     print(f"Convergence curve saved to: {output_path}")
     plt.close()
