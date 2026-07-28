@@ -1,89 +1,134 @@
-# Pipeline de Benchmarking: CINN vs. Metaheurísticas
+# CINN-Surgery-Scheduling
 
-Este repositorio contiene el framework de evaluación comparativa entre el modelo **CINN** (Constrained-Informed Neural Network) y cuatro metaheurísticas estándar (**GA, dPSO, SBOA, dMShOA**) para el problema de programación de quirófanos (Three-Station Job Shop Scheduling).
+Repository for the paper **"Constraint-Informed Neural Networks for Three-Station Surgical Scheduling: A Primal-Dual Augmented Lagrangian Approach"** by Marcelo Becerra-Rozas, Carlos Valle, Nicolas Fuentes Espinoza, Alberto Garces-Jimenez, Jose J. Caro-Miranda, and Jose Manuel Gomez-Pulido.
 
-## 🚀 Guía de Uso Rápido
+## Overview
 
-### 1. Requisitos e Instalación
-El sistema utiliza dos entornos virtuales existentes para gestionar las dependencias de cada proyecto (especialmente Torch para CINN y Scipy para las estadísticas).
+This repository implements a Constraint-Informed Neural Network (CINN) for the Three-Station Job Shop Scheduling Problem applied to hospital surgery planning. The model operates over three sequential stages -- Pre-operative (PRE), Operating Room (QX), and Post-operative recovery (POST) -- with four parallel rooms available at each stage (12 rooms total).
 
-```bash
-# Instalar tabulate para reportes en Markdown (en el entorno de MH)
-MH-hospitals/.venv/Scripts/python -m pip install tabulate -q
+The CINN is trained by minimizing an Augmented Lagrangian that penalizes three families of KKT constraints: sequentiality (operations must follow stage order), maximum inter-stage waiting time (W_max = 25 min), and resource non-overlap (two surgeries cannot occupy the same room simultaneously). The ADMM algorithm alternates between primal descent on the network parameters (AdamW) and dual ascent on the Lagrange multipliers. After training, a Gumbel-Softmax decoding step produces a discrete solution, which is refined through a multi-objective Simulated Annealing post-processing (makespan + wait times + load imbalance).
+
+The CINN is compared against four metaheuristic baselines -- Genetic Algorithm (GA), Discrete Particle Swarm Optimization (dPSO), Secretary Bird Optimization Algorithm (SBOA), and Discrete Mantis Shrimp Optimization Algorithm (dMShOA) -- all evaluated on the same discrete-event scheduling simulator under identical conditions.
+
+## Experimental Instances
+
+The benchmark evaluates all methods on real surgical data from Hospital Puerto Montt (Chile). Three dates were selected from the 2023 calendar, each with two instance sizes:
+
+| Instance | Patients | Available after clinical filtering |
+|----------|----------|------------------------------------|
+| 2023-02-01 | 8 jobs | 28 |
+| 2023-02-01 | 16 jobs | 28 |
+| 2023-06-14 | 8 jobs | 16 |
+| 2023-06-14 | 16 jobs | 16 |
+| 2023-10-13 | 8 jobs | 23 |
+| 2023-10-13 | 16 jobs | 23 |
+
+Each instance is executed with N = 30 independent random seeds for each of the five algorithms, totaling 900 experimental runs. Results are compared via the Relative Percentage Deviation (RPD) from the Best-Known Solution (BKS) per instance, with paired Wilcoxon signed-rank tests at p < 0.05.
+
+## Repository Structure
+
+```
+├── CINN-KKT-hospitals/         # CINN model + SA post-processing
+│   ├── src/                    # model.py, trainer.py, constraints.py, post_processing.py
+│   ├── data/
+│   │   ├── figures/            # PNG + PDF figures (convergence, Gantt, histograms, boxplots)
+│   │   └── processed/          # Generated schedules (CSV)
+│   ├── main.py                 # Standalone CINN execution
+│   ├── main_estadistica.py     # Statistical visualizations
+│   └── requirements.txt
+│
+├── MH-hospitals/               # Metaheuristic baselines
+│   ├── algorithms/             # ga.py, dpso.py, sboa.py, dmshoa.py
+│   ├── simulation/             # Discrete-event scheduler + emergency generator
+│   ├── config/                 # JSON-based parameter configuration
+│   ├── results/                # Simulation outputs and plots per mode
+│   ├── main.py
+│   └── requirements.txt
+│
+├── benchmark_runner.py         # Unified benchmark (CINN + 4 MHs, 30 seeds)
+├── metrics_analyzer.py         # Q1-table generation (RPD + Wilcoxon)
+├── raw_results.csv             # 900-run benchmark dataset
+├── results_summary_q1.csv      # Aggregated comparison table
+├── LICENSE
+└── README.md
 ```
 
-### 2. Ejecución del Experimento
-Para generar los datos crudos (30 ejecuciones por algoritmo con 16 cirugías reales):
+## CINN-KKT-hospitals
+
+The proposed method. A feed-forward neural network with three residual blocks (128 hidden units, Tanh activation) that maps job indices to continuous start times (via Softplus) and per-machine assignment probabilities (via Gumbel-Softmax). Training uses the Augmented Lagrangian formulation with ADMM, minimizing makespan while satisfying KKT constraints. After 8,000 training steps, the best-checkpoint model is decoded into a discrete schedule and refined by 3,000 iterations of multi-objective Simulated Annealing over machine reassignments within each stage.
+
+**Parameters**: setup time = 30 min, cleanup time = 20 min, W_max = 25 min, 4 rooms per stage, AdamW (lr = 1e-3), Gumbel temperature 2.0 to 0.05 (linear decay), rho 100 to 300,000 (exponential growth).
+
+## MH-hospitals
+
+Four population-based metaheuristics for the same three-station problem. All algorithms use a solution encoding that combines a job priority sequence with room assignments and are evaluated via a common discrete-event simulator that enforces setup, cleanup, personnel assignment, and resource constraints.
+
+| Algorithm | Type | Key mechanism |
+|-----------|------|---------------|
+| GA | Genetic Algorithm | OX1 crossover + swap mutation + elitism |
+| dPSO | Discrete Particle Swarm | Sigmoid-based discrete position update |
+| SBOA | Secretary Bird Optimization | Levy flights + two-phase exploration/exploitation |
+| dMShOA | Discrete Mantis Shrimp | Sigmoid velocity discretization + PTI mixing |
+
+Default configuration: 1,000 iterations, population/swarm size = 30.
+
+## Installation
+
+### CINN dependencies
 
 ```bash
-CINN-KKT-hospitals/.venv/Scripts/python benchmark_runner.py
+cd CINN-KKT-hospitals
+python -m venv .venv
+.venv\Scripts\activate     # Windows
+pip install -r requirements.txt
 ```
-*Esto generará el archivo `raw_results.csv`.*
 
-### 3. Análisis Estadístico
-Para generar la tabla de resultados finales con el Test de Wilcoxon:
+Requirements: PyTorch >= 2.0, Pandas, NumPy, Matplotlib, Seaborn.
+
+### MH dependencies
 
 ```bash
-MH-hospitals/.venv/Scripts/python metrics_analyzer.py
+cd MH-hospitals
+python -m venv .venv
+.venv\Scripts\activate     # Windows
+pip install -r requirements.txt
+pip install tabulate        # required by metrics_analyzer.py
 ```
 
----
+Requirements: NumPy, SciPy, Pandas, Matplotlib, Joblib.
 
-## 📊 Interpretación de Métricas
+## Usage
 
-Para validar científicamente los resultados, utilizamos las siguientes métricas:
+### Run CINN standalone (single seed)
 
-1.  **BKS (Best Known Solution):** Es el tiempo mínimo (Makespan) encontrado entre todos los algoritmos durante todas las pruebas. Es nuestro "punto de perfección".
-2.  **RPD (Relative Percentage Deviation):** Indica qué tan lejos (%) está un algoritmo del BKS.
-    *   *Fórmula:* `((Makespan - BKS) / BKS) * 100`
-    *   **0.00%** es la solución perfecta. Valores altos indican ineficiencia.
-3.  **RPD_Avg:** Consistencia del algoritmo a lo largo de las 30 ejecuciones.
-4.  **RPD_Best:** El mejor resultado individual logrado. Indica si el algoritmo es capaz de encontrar el óptimo global.
-5.  **Test de Wilcoxon (+, -, ≈):** Validación estadística con **p-value < 0.05**.
-    *   **(+)**: CINN es significativamente mejor (victoria matemática, no por azar).
-    *   **(-)**: CINN es significativamente peor.
-    *   **(≈)**: Empate estadístico.
+```bash
+cd CINN-KKT-hospitals
+.venv\Scripts\python main.py
+```
 
----
+### Run MH baselines standalone (50 Monte Carlo runs)
 
-## 📈 Resultados Obtenidos (Instancia Real: 01-02-2023)
+```bash
+cd MH-hospitals
+.venv\Scripts\python main.py
+```
 
-| Algoritmo | RPD_Avg | RPD_Best | Time_Avg (s) | Inferencia |
-| :--- | :--- | :--- | :--- | :--- |
-| **CINN (Propuesto)** | **5.49%** | **0.00%** | 81.94 | - |
-| **GA** | 59.02% | 40.44% | 20.83 | **CINN (+)** |
-| **dPSO** | 74.62% | 35.86% | 21.62 | **CINN (+)** |
-| **SBOA** | 64.08% | 39.58% | 38.60 | **CINN (+)** |
-| **dMShOA** | 59.54% | 43.05% | 22.37 | **CINN (+)** |
+### Run full benchmark (CINN vs 4 MHs, 30 seeds x 6 instances)
 
-### Conclusiones Técnicas para el Artículo:
-*   **Precisión:** El modelo CINN demostró una precisión superior, manteniéndose en promedio a solo un **5.49%** del óptimo, mientras que las metaheurísticas fallaron con desviaciones superiores al **50%**.
-*   **Capacidad de Optimización:** CINN fue el único que logró el **RPD 0.00%**, encontrando la mejor configuración de quirófanos posible para ese día.
-*   **Significancia:** El símbolo **(+)** en todos los comparativos confirma que la superioridad de CINN es estadísticamente significativa para una publicación de alto impacto.
+```bash
+CINN-KKT-hospitals\.venv\Scripts\python benchmark_runner.py
+```
 
----
+### Generate Q1 comparison table
 
-## 🛠 Estructura del Pipeline
-*   `benchmark_runner.py`: Orquestador que carga los datos reales, entrena la red CINN y ejecuta las metaheurísticas bajo las mismas condiciones de semillas y datos.
-*   `metrics_analyzer.py`: Procesa `raw_results.csv` para realizar los tests no paramétricos y formatear la tabla Markdown.
-*   `raw_results.csv`: Base de datos de experimentos (150 registros).
+```bash
+MH-hospitals\.venv\Scripts\python metrics_analyzer.py
+```
 
----
+## Data Availability
 
-## Estructura del Repositorio
+The datasets generated and analysed during the current study are not publicly available because they consist of anonymized clinical-operational records provided by Hospital Puerto Montt Dr. Eduardo Schutz Schroeder under institutional data-use restrictions, but are available from the corresponding author on reasonable request and subject to authorization from Hospital Puerto Montt and the Servicio de Salud del Reloncavi.
 
-### CINN-KKT-hospitals/
+## License
 
-Modelo de optimizacion basado en **Constraint-Informed Neural Networks (CINN)** con condiciones KKT y ADMM. Resuelve el problema de Three-Station Job Shop Scheduling para programacion de cirugias hospitalarias.
-
-- **Tecnologias**: PyTorch, Pandas, NumPy, Matplotlib, Seaborn
-- **Version de referencia**: PyTorch 2.10.0+cpu (los resultados pueden variar segun la version de PyTorch)
-- **Post-procesamiento**: Hill Climbing / Simulated Annealing
-
-### MH-hospitals/
-
-Framework de metaheuristicas para el mismo problema de scheduling quirurgico, con simulacion de cirugias electivas y de emergencia.
-
-- **Algoritmos**: GA (Genetic Algorithm), dPSO (Discrete Particle Swarm Optimization), SBOA, dMShOA
-- **Tecnologias**: NumPy, SciPy, Pandas, Matplotlib, Joblib
-- Incluye generacion de reportes, visualizaciones y analisis estadistico.
+MIT License. See [LICENSE](LICENSE) for details.
