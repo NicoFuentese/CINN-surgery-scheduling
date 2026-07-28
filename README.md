@@ -25,6 +25,31 @@ The benchmark evaluates all methods on real surgical data from Hospital Puerto M
 
 Each instance is executed with N = 30 independent random seeds for each of the five algorithms, totaling 900 experimental runs. Results are compared via the Relative Percentage Deviation (RPD) from the Best-Known Solution (BKS) per instance, with paired Wilcoxon signed-rank tests at p < 0.05.
 
+### Instance details (2023-02-01, 16 jobs)
+
+The table below shows the 16 surgical procedures used in the main instance, including specialty, procedure description, and per-stage processing times.
+
+| Job | Specialty | Procedure | dur_pre | dur_qx | dur_post |
+|-----|-----------|-----------|---------|--------|----------|
+| P1 | Neurosurgery | Hernia nucleo pulposo, estenorraquis | 82 min | 60 min | 114 min |
+| P2 | Pediatric Surgery | Colgajos simples dos o mas | 30 min | 44 min | 118 min |
+| P3 | Otolaryngology | Tratamiento quirurgico de Mucositis timpanica | 27 min | 14 min | 95 min |
+| P4 | Traumatology | Luxacion semilunar, escafoidea, reduccion | 58 min | 70 min | 152 min |
+| P5 | Adult Surgery | Hasta 5% superficie corporal receptora | 50 min | 39 min | 120 min |
+| P6 | Traumatology | Osteosintesis diafisiaria o metafisiaria | 74 min | 145 min | 165 min |
+| P7 | Ophthalmology | Vitrectomia c/retinotomia | 15 min | 80 min | 145 min |
+| P8 | Otolaryngology | Tratamiento quirurgico de Mucositis timpanica | 41 min | 14 min | 95 min |
+| P9 | Pediatric Surgery | Quistes y/o fistulas del conducto tirogloso | 23 min | 21 min | 115 min |
+| P10 | Ophthalmology | Herida penetrante corneal o corneo-escleral | 36 min | 25 min | 150 min |
+| P11 | Pediatric Surgery | Circuncision | 29 min | 38 min | 93 min |
+| P12 | Otolaryngology | Con microscopio | 21 min | 57 min | 95 min |
+| P13 | Neurosurgery | Fijacion de columna (cervical/dorsal/lumbar) | 73 min | 75 min | 200 min |
+| P14 | Vascular Surgery | Hasta 5% superficie corporal | 40 min | 58 min | 167 min |
+| P15 | Adult Surgery | Colgajos complejos (Abbe, Mustarda, Convers) | 78 min | 52 min | 180 min |
+| P16 | Pediatric Surgery | Seccion y/o reseccion frenillos cavidad bucal | 17 min | 7 min | 95 min |
+
+*dur_pre = preoperative preparation time; dur_qx = surgical duration; dur_post = recovery time. All times in minutes.*
+
 ## Repository Structure
 
 ```
